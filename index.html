@@ -2,201 +2,776 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0d1117">
-<title>Scraper Status</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,minimum-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scrapers">
+<link rel="manifest" href="manifest.json">
+<title>Scrapers</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:#0d1117;color:#e6edf3;font:15px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  body{min-height:100vh;padding:env(safe-area-inset-top,16px) 12px env(safe-area-inset-bottom,16px)}
-  header{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 16px}
-  h1{font-size:18px;font-weight:600;letter-spacing:-.01em}
-  .updated{font-size:12px;color:#7d8590}
-  .btn{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .btn:active{background:#30363d}
-  .grid{display:grid;grid-template-columns:1fr;gap:10px;max-width:640px;margin:0 auto}
-  @media(min-width:520px){.grid{grid-template-columns:1fr 1fr}}
-  .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px;text-decoration:none;color:inherit;display:block;transition:border-color .15s}
-  .card:active{border-color:#58a6ff}
-  .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-  .name{font-weight:600;font-size:15px}
-  .status{display:flex;align-items:center;gap:6px;font-size:13px}
-  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
-  .ok{background:#3fb950}
-  .fail{background:#f85149}
-  .run{background:#d29922;animation:pulse 1.6s ease-in-out infinite}
-  .none{background:#7d8590}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-  .meta{font-size:12px;color:#7d8590;display:flex;justify-content:space-between;gap:8px}
-  .meta div:last-child{text-align:right}
-  .commit{margin-top:8px;font-size:11px;color:#7d8590;border-top:1px solid #21262d;padding-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .err{color:#f85149;font-size:13px;padding:14px;text-align:center;background:#161b22;border:1px solid #30363d;border-radius:10px}
-  .setup{max-width:420px;margin:48px auto 0;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:18px}
-  .setup h2{font-size:16px;margin-bottom:12px}
-  .setup p{font-size:13px;color:#7d8590;margin-bottom:10px;line-height:1.55}
-  .setup a{color:#58a6ff;text-decoration:none}
-  .setup input{width:100%;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:9px 11px;border-radius:6px;font-size:14px;margin-bottom:10px;font-family:ui-monospace,monospace}
-  .setup input:focus{outline:none;border-color:#58a6ff}
-  .setup .btn{width:100%;background:#238636;border-color:#238636;padding:9px;font-size:14px}
-  .setup .btn:active{background:#1f6f2c}
-  .setup ol{margin:6px 0 14px 18px;font-size:13px;color:#7d8590;line-height:1.7}
-  .setup code{background:#0d1117;padding:1px 5px;border-radius:3px;font-size:12px;color:#e6edf3;font-family:ui-monospace,monospace}
-  footer{text-align:center;font-size:11px;color:#484f58;padding:20px 0 8px}
+  /*
+   * Visual design rationale (clinical/behavioural psychology + neurology lens):
+   *  - Pure black background reduces OLED retinal load + matches iOS dark.
+   *  - 17px body, -.01em tracking: SF Pro proportions; lowers reading effort.
+   *  - Grouped lists, 13px section labels: information chunking — Miller's 7±2.
+   *  - Single accent (system blue) for actions; status uses semantic colors only.
+   *  - Status dot 12px + label: redundant encoding (colour + word), accessible
+   *    to colour-vision differences; reduces ambiguity → reduces cognitive load.
+   *  - Animations <300ms, cubic-bezier(.34,1.56,.64,1): spring feel without
+   *    distracting from primary task (status scanning).
+   *  - 44px min tap target (iOS HIG / Fitts's law).
+   *  - High WCAG AAA contrast on primary text in both schemes.
+   */
+  :root {
+    color-scheme: dark light;
+    --bg: #000000;
+    --bg-elev: #1C1C1E;
+    --bg-elev-2: #2C2C2E;
+    --sep: rgba(84, 84, 88, 0.35);
+    --text: #FFFFFF;
+    --text-2: rgba(235, 235, 245, 0.6);
+    --text-3: rgba(235, 235, 245, 0.3);
+    --blue: #0A84FF;
+    --blue-2: rgba(10, 132, 255, 0.18);
+    --green: #30D158;
+    --red:   #FF453A;
+    --orange:#FF9F0A;
+    --yellow:#FFD60A;
+    --gray:  #8E8E93;
+    --r: 14px;
+    --pad: 16px;
+    --tap: 44px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #F2F2F7;
+      --bg-elev: #FFFFFF;
+      --bg-elev-2: #F2F2F7;
+      --sep: rgba(60, 60, 67, 0.18);
+      --text: #000000;
+      --text-2: rgba(60, 60, 67, 0.6);
+      --text-3: rgba(60, 60, 67, 0.3);
+      --blue: #007AFF;
+      --blue-2: rgba(0, 122, 255, 0.12);
+      --green: #34C759;
+      --red:   #FF3B30;
+      --orange:#FF9500;
+      --yellow:#FFCC00;
+    }
+  }
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+    overscroll-behavior-y: none;
+  }
+  button, input { font: inherit; color: inherit; letter-spacing: inherit; }
+  button {
+    border: 0; background: none; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  a { color: var(--blue); text-decoration: none; }
+
+  /* ---- App shell ---- */
+  .app { max-width: 560px; margin: 0 auto; padding: 0 var(--pad) 32px; }
+
+  /* ---- Hero header ---- */
+  .hero { padding: 18px 4px 22px; }
+  .hero h1 { font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.025em; }
+  .hero .sub { color: var(--text-2); font-size: 15px; margin-top: 4px; }
+
+  /* ---- Run-all card (prominent CTA) ---- */
+  .cta {
+    background: linear-gradient(135deg, var(--blue), color-mix(in srgb, var(--blue) 75%, #5E5CE6));
+    color: #fff;
+    border-radius: 18px;
+    padding: 16px 20px;
+    margin: 8px 0 26px;
+    display: flex; align-items: center; gap: 14px;
+    min-height: 64px;
+    transition: transform .15s cubic-bezier(.34,1.56,.64,1), filter .15s;
+    box-shadow: 0 8px 24px -8px color-mix(in srgb, var(--blue) 50%, transparent);
+  }
+  .cta:active { transform: scale(0.97); filter: brightness(0.92); }
+  .cta .icon { font-size: 24px; line-height: 1; }
+  .cta .label { flex: 1; }
+  .cta .title { font-weight: 600; font-size: 17px; }
+  .cta .desc  { font-size: 13px; opacity: 0.86; margin-top: 2px; }
+  .cta .chev  { font-size: 18px; opacity: 0.8; }
+  .cta[disabled] { opacity: 0.55; pointer-events: none; }
+
+  /* ---- Section ---- */
+  .section { margin-top: 10px; }
+  .section-label {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    padding: 8px 18px 6px;
+    font-weight: 500;
+  }
+
+  /* ---- Grouped list (iOS inset grouped table) ---- */
+  .group {
+    background: var(--bg-elev);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+    min-height: var(--tap);
+    width: 100%;
+    text-align: left;
+    transition: background .12s;
+    position: relative;
+  }
+  .row + .row { border-top: 0.5px solid var(--sep); }
+  .row:active { background: var(--bg-elev-2); }
+
+  /* status dot */
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  .dot.ok   { background: var(--green); }
+  .dot.fail { background: var(--red);   }
+  .dot.run  { background: var(--orange); animation: pulse 1.4s cubic-bezier(.4,0,.6,1) infinite; }
+  .dot.idle { background: var(--gray);  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 60%, transparent); }
+    50%     { box-shadow: 0 0 0 6px color-mix(in srgb, var(--orange) 0%, transparent); }
+  }
+
+  .row .meta { flex: 1; min-width: 0; }
+  .row .name { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
+  .row .info { color: var(--text-2); font-size: 13px; margin-top: 2px;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .chev { color: var(--text-3); font-size: 15px; font-weight: 600; flex-shrink: 0; }
+
+  /* ---- Footer caption ---- */
+  .caption { color: var(--text-3); font-size: 12px; padding: 16px 4px 0; text-align: center; line-height: 1.55; }
+  .caption a { color: var(--text-2); }
+
+  /* ---- Action sheet ---- */
+  .sheet-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s ease-out;
+    z-index: 100;
+    backdrop-filter: blur(2px);
+  }
+  .sheet-bg.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 8px; right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0));
+    transform: translateY(120%);
+    transition: transform .35s cubic-bezier(.32,.72,.32,1);
+    z-index: 101;
+    max-width: 544px; margin: 0 auto;
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-group {
+    background: var(--bg-elev);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+  }
+  .sheet-head {
+    padding: 14px 16px 12px;
+    text-align: center;
+    border-bottom: 0.5px solid var(--sep);
+  }
+  .sheet-head .h-title { font-weight: 600; font-size: 15px; }
+  .sheet-head .h-sub   { font-size: 13px; color: var(--text-2); margin-top: 3px; }
+  .sheet-btn {
+    width: 100%; padding: 14px;
+    font-size: 17px;
+    color: var(--blue);
+    background: var(--bg-elev);
+    transition: background .08s;
+    min-height: var(--tap);
+  }
+  .sheet-btn + .sheet-btn { border-top: 0.5px solid var(--sep); }
+  .sheet-btn:active { background: var(--bg-elev-2); }
+  .sheet-btn.destructive { color: var(--red); }
+  .sheet-btn.bold { font-weight: 600; }
+  .sheet-btn[disabled] { color: var(--text-3); }
+
+  /* ---- Alert (used for Run All / errors) ---- */
+  .alert-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+    z-index: 110;
+    display: grid; place-items: center;
+    padding: 24px;
+  }
+  .alert-bg.open { opacity: 1; pointer-events: auto; }
+  .alert {
+    width: 100%; max-width: 270px;
+    background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+    backdrop-filter: blur(20px);
+    border-radius: 14px;
+    overflow: hidden;
+    transform: scale(0.86);
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+    text-align: center;
+  }
+  .alert-bg.open .alert { transform: scale(1); }
+  .alert-head { padding: 19px 16px 14px; border-bottom: 0.5px solid var(--sep); }
+  .alert-title { font-size: 17px; font-weight: 600; }
+  .alert-msg   { font-size: 13px; color: var(--text-2); margin-top: 4px; line-height: 1.4; }
+  .alert-btns  { display: grid; grid-template-columns: 1fr; }
+  .alert-btns.two { grid-template-columns: 1fr 1fr; }
+  .alert-btn   {
+    padding: 12px 8px;
+    font-size: 17px;
+    color: var(--blue);
+    min-height: var(--tap);
+  }
+  .alert-btn + .alert-btn { border-left: 0.5px solid var(--sep); }
+  .alert-btns.two .alert-btn + .alert-btn { border-top: 0; }
+  .alert-btn:active { background: var(--bg-elev-2); }
+  .alert-btn.destructive { color: var(--red); font-weight: 600; }
+  .alert-btn.bold { font-weight: 600; }
+
+  /* ---- Setup screen ---- */
+  .setup { padding: 16px 8px 32px; }
+  .setup h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; padding: 0 4px; }
+  .setup .lede { color: var(--text-2); font-size: 15px; padding: 8px 4px 18px; line-height: 1.45; }
+  .setup .steps {
+    background: var(--bg-elev);
+    border-radius: var(--r);
+    padding: 6px 0;
+    margin-bottom: 16px;
+  }
+  .step { display: flex; gap: 14px; padding: 10px 16px; align-items: flex-start; }
+  .step + .step { border-top: 0.5px solid var(--sep); }
+  .step .n {
+    background: var(--blue-2); color: var(--blue);
+    width: 24px; height: 24px; border-radius: 50%;
+    display: grid; place-items: center; flex-shrink: 0;
+    font-size: 13px; font-weight: 600; margin-top: 2px;
+  }
+  .step .t { font-size: 15px; }
+  .step .t code, .step .t b { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+                              background: var(--bg-elev-2); padding: 1px 6px;
+                              border-radius: 4px; color: var(--text); }
+  .step .t b { font-weight: 600; }
+  .input-wrap { background: var(--bg-elev); border-radius: var(--r); padding: 4px 0; }
+  .input { width: 100%; background: transparent; border: 0;
+           padding: 13px 16px; outline: none;
+           font: 15px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .input::placeholder { color: var(--text-3); }
+  .primary {
+    width: 100%; padding: 14px; margin-top: 14px;
+    background: var(--blue); color: #fff;
+    border-radius: var(--r);
+    font-size: 17px; font-weight: 600;
+    transition: transform .15s, filter .15s;
+    min-height: 50px;
+  }
+  .primary:active { transform: scale(0.98); filter: brightness(0.92); }
+  .primary[disabled] { opacity: 0.4; pointer-events: none; }
+
+  /* ---- Toast ---- */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom, 0));
+    transform: translate(-50%, 32px);
+    background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
+    backdrop-filter: blur(20px);
+    color: var(--text);
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-size: 14px; font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    opacity: 0; pointer-events: none;
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s;
+    z-index: 200;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.ok   { color: var(--green); }
+  .toast.err  { color: var(--red); }
+
+  /* ---- Skeleton loader ---- */
+  .skel { background: var(--bg-elev-2); border-radius: 6px; height: 14px;
+          animation: shimmer 1.4s linear infinite; background-size: 200% 100%;
+          background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent); }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+<div class="alert-bg" id="alertBg"></div>
+<div class="toast" id="toast"></div>
+
 <script>
-const OWNER="mrakader";
-const REPOS=[
-  {key:"mrprice",      repo:"scraper",                label:"Mr Price"},
-  {key:"tfg",          repo:"tfg-scraper",            label:"TFG"},
-  {key:"bashmens",     repo:"bash-mens-scraper",      label:"bash-mens"},
-  {key:"superbalist",  repo:"superbalist-scraper",    label:"Superbalist"},
-  {key:"evolve",       repo:"evolve-scraper",         label:"Evolve"},
-  {key:"fashionfusion",repo:"fashion-fusion-scraper", label:"Fashion Fusion"}
+const OWNER = "mrakader";
+const REPOS = [
+  {key:"mrprice",       repo:"scraper",                label:"Mr Price"},
+  {key:"tfg",           repo:"tfg-scraper",            label:"TFG"},
+  {key:"bashmens",      repo:"bash-mens-scraper",      label:"bash-mens"},
+  {key:"superbalist",   repo:"superbalist-scraper",    label:"Superbalist"},
+  {key:"evolve",        repo:"evolve-scraper",         label:"Evolve"},
+  {key:"fashionfusion", repo:"fashion-fusion-scraper", label:"Fashion Fusion"}
 ];
-const TOKEN_KEY="ss_gh_pat_v1";
-const app=document.getElementById("app");
+const WORKFLOW_FILE = "daily.yml";
+const TOKEN_KEY = "ss_gh_pat_v1";
 
-function token(){return localStorage.getItem(TOKEN_KEY)||""}
-function setToken(t){if(t)localStorage.setItem(TOKEN_KEY,t);else localStorage.removeItem(TOKEN_KEY)}
-function rel(iso){
-  if(!iso)return"—";
-  const d=new Date(iso),s=(Date.now()-d.getTime())/1000;
-  if(s<60)return Math.floor(s)+"s ago";
-  if(s<3600)return Math.floor(s/60)+"m ago";
-  if(s<86400)return Math.floor(s/3600)+"h ago";
-  return Math.floor(s/86400)+"d ago";
+const app  = document.getElementById("app");
+const sheet = document.getElementById("sheet");
+const sheetBg = document.getElementById("sheetBg");
+const alertBg = document.getElementById("alertBg");
+const toastEl = document.getElementById("toast");
+
+// ---- token / utils ----
+function token() { return localStorage.getItem(TOKEN_KEY) || ""; }
+function setToken(t) {
+  if (t) localStorage.setItem(TOKEN_KEY, t);
+  else   localStorage.removeItem(TOKEN_KEY);
 }
-function dur(start,end){
-  if(!start||!end)return"—";
-  const s=Math.floor((new Date(end)-new Date(start))/1000);
-  if(s<60)return s+"s";
-  const m=Math.floor(s/60),r=s%60;
-  if(m<60)return m+"m "+r+"s";
-  return Math.floor(m/60)+"h "+(m%60)+"m";
+function rel(iso) {
+  if (!iso) return "—";
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 0)      return "just now";
+  if (s < 60)     return Math.max(1, Math.floor(s)) + "s ago";
+  if (s < 3600)   return Math.floor(s / 60) + "m ago";
+  if (s < 86400)  return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
 }
-function fmtDate(iso){
-  if(!iso)return"";
-  return new Date(iso).toLocaleString("en-ZA",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+function dur(startIso, endIso) {
+  if (!startIso || !endIso) return "—";
+  const s = Math.floor((new Date(endIso) - new Date(startIso)) / 1000);
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60), r = s % 60;
+  if (m < 60) return `${m}m ${r}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-async function gh(path){
-  const r=await fetch("https://api.github.com"+path,{
-    headers:{Authorization:"Bearer "+token(),Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}
+async function gh(path, opts = {}) {
+  const res = await fetch("https://api.github.com" + path, {
+    ...opts,
+    headers: {
+      Authorization: "Bearer " + token(),
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(opts.headers || {}),
+    },
   });
-  if(r.status===401||r.status===403)throw Object.assign(new Error("auth"),{auth:true});
-  if(!r.ok)throw new Error("HTTP "+r.status);
-  return r.json();
-}
-
-async function loadRepo(r){
-  try{
-    const [runs,commits]=await Promise.all([
-      gh(`/repos/${OWNER}/${r.repo}/actions/runs?per_page=1`),
-      gh(`/repos/${OWNER}/${r.repo}/commits?per_page=1`)
-    ]);
-    const run=(runs.workflow_runs||[])[0];
-    const commit=commits[0]||{};
-    return {ok:true,run,commit};
-  }catch(e){return {ok:false,err:e}}
-}
-
-function statusOf(run){
-  if(!run)return{cls:"none",label:"no runs"};
-  if(run.status==="in_progress"||run.status==="queued")return{cls:"run",label:run.status==="queued"?"queued":"running"};
-  if(run.conclusion==="success")return{cls:"ok",label:"success"};
-  if(run.conclusion==="failure"||run.conclusion==="timed_out")return{cls:"fail",label:run.conclusion};
-  if(run.conclusion==="cancelled")return{cls:"fail",label:"cancelled"};
-  return{cls:"none",label:run.conclusion||run.status||"unknown"};
-}
-
-function renderSetup(msg){
-  app.innerHTML=`
-    <header><h1>Scraper Status</h1></header>
-    <div class="setup">
-      <h2>One-time setup</h2>
-      ${msg?`<p style="color:#f85149">${msg}</p>`:""}
-      <p>This dashboard reads GitHub Actions status for your private scraper repos. It needs a Personal Access Token (PAT) with read-only repo permission. The token is stored only in your browser's localStorage.</p>
-      <ol>
-        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">github.com/settings/personal-access-tokens/new</a></li>
-        <li>Token name: <code>scraper-dashboard</code></li>
-        <li>Expiration: 1 year</li>
-        <li>Repository access: Selected repositories → pick all 6 scrapers</li>
-        <li>Permissions → Repository → Actions: <b>Read</b>, Contents: <b>Read</b>, Metadata: <b>Read</b></li>
-        <li>Generate, copy, paste below</li>
-      </ol>
-      <input id="t" type="password" placeholder="github_pat_..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-      <button class="btn" onclick="saveToken()">Save &amp; load dashboard</button>
-    </div>
-    <footer>github.com/mrakader/scraper-dashboard</footer>`;
-  document.getElementById("t").focus();
-}
-window.saveToken=function(){
-  const v=document.getElementById("t").value.trim();
-  if(!v)return;
-  setToken(v);
-  loadAll();
-};
-
-function cardHTML(r,data){
-  if(!data.ok){
-    return `<div class="card" style="opacity:.6"><div class="card-head"><span class="name">${r.label}</span><span class="status"><span class="dot none"></span>error</span></div><div class="meta"><div>${data.err&&data.err.message||"failed"}</div></div></div>`;
+  if (res.status === 401) throw Object.assign(new Error("auth"), {code: 401});
+  if (res.status === 403) throw Object.assign(new Error("forbidden"), {code: 403});
+  if (res.status === 404) throw Object.assign(new Error("not found"), {code: 404});
+  if (!res.ok && res.status !== 204) {
+    let body = "";
+    try { body = await res.text(); } catch {}
+    throw Object.assign(new Error("HTTP " + res.status), {code: res.status, body});
   }
-  const s=statusOf(data.run);
-  const run=data.run||{};
-  const c=data.commit||{};
-  const commitMsg=(c.commit&&c.commit.message||"—").split("\n")[0].slice(0,80);
-  const commitWhen=c.commit&&(c.commit.author||c.commit.committer);
-  return `<a class="card" href="https://github.com/${OWNER}/${r.repo}/actions" target="_blank" rel="noopener">
-    <div class="card-head"><span class="name">${r.label}</span><span class="status"><span class="dot ${s.cls}"></span>${s.label}</span></div>
-    <div class="meta"><div>${run.run_started_at?rel(run.run_started_at):"never"}</div><div>${run.status==="completed"?dur(run.run_started_at,run.updated_at):run.status==="in_progress"?"running":""}</div></div>
-    <div class="commit">${commitMsg}${commitWhen?" · "+rel(commitWhen.date):""}</div>
-  </a>`;
+  if (res.status === 204) return null;
+  return res.json();
 }
 
-let lastUpdate=null;
-function renderDashboard(results){
-  lastUpdate=Date.now();
-  app.innerHTML=`
-    <header>
-      <h1>Scraper Status</h1>
-      <button class="btn" onclick="refresh()">Refresh</button>
-    </header>
-    <div class="grid">${REPOS.map((r,i)=>cardHTML(r,results[i])).join("")}</div>
-    <footer>Updated <span id="upd">just now</span> · <a href="#" onclick="event.preventDefault();logout()" style="color:#7d8590">change token</a></footer>`;
+async function fetchRepo(r) {
+  try {
+    const [runs, commits] = await Promise.all([
+      gh(`/repos/${OWNER}/${r.repo}/actions/runs?per_page=1`),
+      gh(`/repos/${OWNER}/${r.repo}/commits?per_page=1`),
+    ]);
+    return {
+      ok: true,
+      run: (runs.workflow_runs || [])[0] || null,
+      commit: commits[0] || null,
+    };
+  } catch (e) {
+    return {ok: false, err: e};
+  }
+}
+
+async function dispatchWorkflow(repo) {
+  return gh(`/repos/${OWNER}/${repo}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ref: "main"}),
+  });
+}
+
+function statusOf(run) {
+  if (!run) return {cls: "idle", label: "Never run"};
+  const s = run.status;
+  if (s === "in_progress" || s === "queued" || s === "requested" || s === "waiting" || s === "pending")
+    return {cls: "run", label: s === "queued" ? "Queued" : "Running"};
+  if (run.conclusion === "success")   return {cls: "ok",   label: "Healthy"};
+  if (run.conclusion === "failure" || run.conclusion === "timed_out")
+    return {cls: "fail", label: run.conclusion === "timed_out" ? "Timed out" : "Failed"};
+  if (run.conclusion === "cancelled") return {cls: "fail", label: "Cancelled"};
+  return {cls: "idle", label: run.conclusion || s || "Unknown"};
+}
+
+// ---- toast ----
+let toastTimer = null;
+function toast(msg, kind = "") {
+  clearTimeout(toastTimer);
+  toastEl.className = "toast " + kind;
+  toastEl.textContent = msg;
+  requestAnimationFrame(() => toastEl.classList.add("show"));
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2400);
+}
+
+// ---- action sheet ----
+function openSheet(html) {
+  sheet.innerHTML = html;
+  sheetBg.classList.add("open");
+  requestAnimationFrame(() => sheet.classList.add("open"));
+}
+function closeSheet() {
+  sheet.classList.remove("open");
+  sheetBg.classList.remove("open");
+  setTimeout(() => { sheet.innerHTML = ""; }, 300);
+}
+
+// ---- alert ----
+function openAlert({title, msg, buttons}) {
+  const btns = buttons.map((b, i) => `
+    <button class="alert-btn ${b.bold ? "bold" : ""} ${b.destructive ? "destructive" : ""}"
+            data-i="${i}">${b.label}</button>`).join("");
+  alertBg.innerHTML = `
+    <div class="alert">
+      <div class="alert-head">
+        <div class="alert-title">${title}</div>
+        ${msg ? `<div class="alert-msg">${msg}</div>` : ""}
+      </div>
+      <div class="alert-btns ${buttons.length === 2 ? "two" : ""}">${btns}</div>
+    </div>`;
+  alertBg.classList.add("open");
+  alertBg.querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      alertBg.classList.remove("open");
+      setTimeout(() => { alertBg.innerHTML = ""; }, 200);
+      const cb = buttons[parseInt(b.dataset.i, 10)].action;
+      if (cb) cb();
+    };
+  });
+}
+
+// ---- render: setup ----
+function renderSetup(errorMsg) {
+  app.innerHTML = `
+    <div class="app">
+      <div class="setup">
+        <h2>Welcome</h2>
+        <div class="lede">
+          A private dashboard for your scrapers. It reads GitHub Actions
+          status — and now, can trigger runs too. Token stays in your
+          browser; nothing is sent anywhere except <code>api.github.com</code>.
+        </div>
+        ${errorMsg ? `<div class="lede" style="color:var(--red);padding-top:0">${errorMsg}</div>` : ""}
+        <div class="steps">
+          <div class="step"><div class="n">1</div><div class="t">Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">github.com/settings/personal-access-tokens/new</a></div></div>
+          <div class="step"><div class="n">2</div><div class="t">Token name <b>scraper-dashboard</b>, expiration <b>1 year</b></div></div>
+          <div class="step"><div class="n">3</div><div class="t">Repository access → <b>Only select repositories</b> → pick all 6 scrapers</div></div>
+          <div class="step"><div class="n">4</div><div class="t">Permissions → Repository → <b>Actions: Read and write</b>, <b>Contents: Read</b>, <b>Metadata: Read</b></div></div>
+          <div class="step"><div class="n">5</div><div class="t">Generate, copy, paste below</div></div>
+        </div>
+        <div class="input-wrap">
+          <input id="t" class="input" type="password" placeholder="github_pat_..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </div>
+        <button class="primary" id="saveT">Save &amp; continue</button>
+      </div>
+    </div>`;
+  document.getElementById("t").focus();
+  document.getElementById("saveT").onclick = () => {
+    const v = document.getElementById("t").value.trim();
+    if (!v) return;
+    setToken(v);
+    loadAll();
+  };
+  document.getElementById("t").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("saveT").click();
+  });
+}
+
+// ---- render: dashboard ----
+let lastResults = null;
+let lastUpdate = null;
+let updateTickHandle = null;
+
+function describe(data) {
+  if (!data.ok) {
+    return {dot: "idle", label: data.err && data.err.code === 403 ? "No access" : "Error"};
+  }
+  return statusOf(data.run);
+}
+function subline(data) {
+  if (!data.ok) {
+    const c = data.err && data.err.code;
+    if (c === 403) return "Token can't read this repo";
+    if (c === 404) return "Repository not found";
+    return "Couldn't fetch";
+  }
+  const run = data.run;
+  if (!run) return "No runs yet";
+  const when = rel(run.run_started_at || run.created_at);
+  if (run.status === "completed") {
+    return `${when} · ran ${dur(run.run_started_at, run.updated_at)}`;
+  }
+  return `Started ${when}`;
+}
+
+function renderDashboard(results) {
+  lastResults = results;
+  lastUpdate = Date.now();
+  const rows = REPOS.map((r, i) => {
+    const d = describe(results[i]);
+    return `
+      <button class="row" data-i="${i}">
+        <span class="dot ${d.dot || d.cls}"></span>
+        <span class="meta">
+          <div class="name">${r.label}</div>
+          <div class="info"><span style="color:var(--text)">${d.label}</span><span style="color:var(--text-3);margin:0 6px">·</span>${subline(results[i])}</div>
+        </span>
+        <span class="chev">›</span>
+      </button>`;
+  }).join("");
+
+  app.innerHTML = `
+    <div class="app">
+      <div class="hero">
+        <h1>Scrapers</h1>
+        <div class="sub">Tap any to manage · <span id="upd">just updated</span></div>
+      </div>
+      <button class="cta" id="runAll">
+        <span class="icon">⏵</span>
+        <span class="label">
+          <div class="title">Run all scrapers</div>
+          <div class="desc">Triggers ${REPOS.length} workflow dispatches</div>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="section">
+        <div class="section-label">Status</div>
+        <div class="group">${rows}</div>
+      </div>
+      <div class="section">
+        <div class="section-label">Settings</div>
+        <div class="group">
+          <button class="row" id="refresh">
+            <span class="meta"><div class="name">Refresh now</div><div class="info">Force-pull latest status</div></span>
+            <span class="chev">↻</span>
+          </button>
+          <button class="row" id="changeT">
+            <span class="meta"><div class="name">Change token</div><div class="info">Sign out and re-enter PAT</div></span>
+            <span class="chev">›</span>
+          </button>
+        </div>
+      </div>
+      <div class="caption">
+        Auto-refreshes every 60 seconds while open.<br>
+        <a href="https://github.com/${OWNER}/scraper-dashboard" target="_blank">github.com/${OWNER}/scraper-dashboard</a>
+      </div>
+    </div>`;
+
+  document.querySelectorAll(".row[data-i]").forEach(el => {
+    el.onclick = () => openCardSheet(parseInt(el.dataset.i, 10));
+  });
+  document.getElementById("runAll").onclick = () => confirmRunAll();
+  document.getElementById("refresh").onclick = () => { loadAll(); };
+  document.getElementById("changeT").onclick = () => {
+    openAlert({
+      title: "Change token?",
+      msg: "Your current token will be cleared from this device.",
+      buttons: [
+        {label: "Cancel"},
+        {label: "Sign out", destructive: true, bold: true,
+         action: () => { setToken(""); renderSetup(); }},
+      ],
+    });
+  };
+
   tickUpd();
 }
-function tickUpd(){
-  const el=document.getElementById("upd");
-  if(!el||!lastUpdate)return;
-  el.textContent=rel(new Date(lastUpdate).toISOString());
-  setTimeout(tickUpd,15000);
-}
-window.logout=function(){setToken("");renderSetup()};
-window.refresh=function(){loadAll()};
 
-async function loadAll(){
-  if(!token())return renderSetup();
-  app.innerHTML=`<header><h1>Scraper Status</h1></header><div class="err" style="opacity:.6">Loading…</div>`;
-  let authFailed=false;
-  const results=await Promise.all(REPOS.map(async r=>{
-    const res=await loadRepo(r);
-    if(!res.ok&&res.err&&res.err.auth)authFailed=true;
+function tickUpd() {
+  clearTimeout(updateTickHandle);
+  const el = document.getElementById("upd");
+  if (!el || !lastUpdate) return;
+  const s = (Date.now() - lastUpdate) / 1000;
+  el.textContent = s < 5 ? "just updated" : "updated " + rel(new Date(lastUpdate).toISOString());
+  updateTickHandle = setTimeout(tickUpd, 15000);
+}
+
+function openCardSheet(i) {
+  const r = REPOS[i];
+  const data = lastResults && lastResults[i];
+  const d = describe(data || {ok: false});
+  const sub = data ? subline(data) : "";
+  const isRunning = d.cls === "run" || d.dot === "run";
+  const runUrl = data && data.ok && data.run
+    ? data.run.html_url
+    : `https://github.com/${OWNER}/${r.repo}/actions`;
+
+  openSheet(`
+    <div class="sheet-group">
+      <div class="sheet-head">
+        <div class="h-title">${r.label}</div>
+        <div class="h-sub">${d.label} · ${sub}</div>
+      </div>
+      <button class="sheet-btn bold" id="aRun" ${isRunning ? "disabled" : ""}>
+        ${isRunning ? "Already running" : "Run scrape now"}
+      </button>
+      <button class="sheet-btn" id="aGh">Open in GitHub</button>
+      ${isRunning ? `<button class="sheet-btn destructive" id="aCancel">Cancel run</button>` : ""}
+    </div>
+    <div class="sheet-group">
+      <button class="sheet-btn bold" onclick="closeSheet()">Cancel</button>
+    </div>
+  `);
+  document.getElementById("aRun").onclick = () => {
+    closeSheet();
+    confirmRunOne(i);
+  };
+  document.getElementById("aGh").onclick = () => {
+    window.open(runUrl, "_blank", "noopener");
+    closeSheet();
+  };
+  const cancelBtn = document.getElementById("aCancel");
+  if (cancelBtn) cancelBtn.onclick = async () => {
+    closeSheet();
+    if (!data || !data.run) return;
+    try {
+      await gh(`/repos/${OWNER}/${r.repo}/actions/runs/${data.run.id}/cancel`, {method: "POST"});
+      toast("Cancelling…", "ok");
+      setTimeout(loadAll, 1500);
+    } catch (e) { handleApiError(e, "cancel"); }
+  };
+}
+
+function confirmRunOne(i) {
+  const r = REPOS[i];
+  openAlert({
+    title: `Run ${r.label}?`,
+    msg: "This will dispatch a workflow run on GitHub Actions and consume minutes from your quota.",
+    buttons: [
+      {label: "Cancel"},
+      {label: "Run", bold: true, action: () => runOne(r)},
+    ],
+  });
+}
+function confirmRunAll() {
+  openAlert({
+    title: `Run all ${REPOS.length} scrapers?`,
+    msg: "This will trigger every workflow back-to-back. Superbalist alone uses ~330 minutes per run.",
+    buttons: [
+      {label: "Cancel"},
+      {label: "Run all", destructive: true, bold: true, action: runAll},
+    ],
+  });
+}
+
+async function runOne(r) {
+  try {
+    toast(`Triggering ${r.label}…`);
+    await dispatchWorkflow(r.repo);
+    toast(`${r.label} queued`, "ok");
+    setTimeout(loadAll, 2000);
+  } catch (e) { handleApiError(e, "trigger " + r.label); }
+}
+async function runAll() {
+  toast("Triggering all scrapers…");
+  let ok = 0, fail = 0;
+  for (const r of REPOS) {
+    try { await dispatchWorkflow(r.repo); ok++; }
+    catch (e) { fail++; console.error(r.repo, e); }
+  }
+  if (fail === 0)             toast(`All ${ok} scrapers queued`, "ok");
+  else if (ok > 0)            toast(`${ok} queued, ${fail} failed`, "err");
+  else                        toast("All dispatches failed — check token permissions", "err");
+  setTimeout(loadAll, 2500);
+}
+
+function handleApiError(e, what) {
+  const c = e && e.code;
+  if (c === 401) {
+    toast("Token rejected", "err");
+    renderSetup("Token rejected or expired. Generate a new one with the same permissions.");
+    return;
+  }
+  if (c === 403) {
+    toast("Permission denied", "err");
+    openAlert({
+      title: "Permission denied",
+      msg: "Your token can't " + what + ". You probably need to add <b>Actions: Read and write</b> to the token. Open the token settings on github.com and update the Actions permission.",
+      buttons: [
+        {label: "Open settings", bold: true,
+          action: () => window.open("https://github.com/settings/personal-access-tokens", "_blank", "noopener")},
+        {label: "OK"},
+      ],
+    });
+    return;
+  }
+  toast("Couldn't " + what, "err");
+}
+
+// ---- main load loop ----
+async function loadAll() {
+  if (!token()) return renderSetup();
+  if (!lastResults) {
+    // First load — show skeleton list while fetching.
+    app.innerHTML = `
+      <div class="app">
+        <div class="hero"><h1>Scrapers</h1><div class="sub">Loading…</div></div>
+        <div class="cta" style="opacity:.5;pointer-events:none">
+          <span class="icon">⏵</span>
+          <span class="label"><div class="title">Run all scrapers</div><div class="desc">…</div></span>
+        </div>
+        <div class="section"><div class="section-label">Status</div>
+          <div class="group">
+            ${REPOS.map(r => `
+              <div class="row">
+                <span class="dot idle"></span>
+                <span class="meta"><div class="name">${r.label}</div><div class="info"><div class="skel" style="width:70%"></div></div></span>
+              </div>`).join("")}
+          </div>
+        </div>
+      </div>`;
+  }
+  let authFailed = false;
+  const results = await Promise.all(REPOS.map(async r => {
+    const res = await fetchRepo(r);
+    if (!res.ok && res.err && res.err.code === 401) authFailed = true;
     return res;
   }));
-  if(authFailed)return renderSetup("Token rejected or expired. Please paste a new one.");
+  if (authFailed) return renderSetup("Token rejected or expired. Please paste a new one.");
   renderDashboard(results);
 }
 
-// auto-refresh every 60s when visible
-let refreshTimer=null;
-function startTimer(){
-  if(refreshTimer)clearInterval(refreshTimer);
-  refreshTimer=setInterval(()=>{if(!document.hidden&&token())loadAll()},60000);
+// auto-refresh
+let refreshTimer = null;
+function startTimer() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    if (!document.hidden && token()) loadAll();
+  }, 60000);
 }
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&token())loadAll()});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && token()) loadAll();
+});
 startTimer();
 
 loadAll();
