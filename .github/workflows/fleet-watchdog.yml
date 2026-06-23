@@ -1,0 +1,68 @@
+name: fleet-watchdog
+
+# Daily health check for the 6-scraper fleet. Lives in a PUBLIC, NON-scraper repo
+# (scraper-dashboard) so it runs on free Actions minutes and its own pass/fail can
+# never masquerade as one of the monitored scrapers. Quiet when healthy; FAILS
+# (-> GitHub emails you) when a monitored scraper has no successful daily run within
+# MAX_AGE_HOURS.
+#
+# Needs repo secret FLEET_PAT (a PAT with Actions:read on the private scraper repos)
+# to see the 5 private repos. WITHOUT it, it monitors only the public repo and emits a
+# non-failing warning, so it never false-alarms before the secret is configured.
+
+on:
+  schedule:
+    - cron: "37 19 * * *"   # 19:37 UTC daily, after the ~15:30 UTC scrape window
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all 6 scrapers had a recent successful daily run
+        env:
+          GH_PAT: ${{ secrets.FLEET_PAT }}
+        run: |
+          set -uo pipefail
+          REPOS="scraper tfg-scraper bash-mens-scraper superbalist-scraper evolve-scraper fashion-fusion-scraper"
+          MAX_AGE_HOURS=36
+          HAVE_PAT=0; [ -n "${GH_PAT:-}" ] && HAVE_PAT=1
+          now=$(date -u +%s)
+          fail=0; warn=0; report=""
+          for r in $REPOS; do
+            hdr=(-H "Accept: application/vnd.github+json")
+            [ "$HAVE_PAT" = "1" ] && hdr+=(-H "Authorization: Bearer $GH_PAT")
+            resp=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/actions/workflows/daily.yml/runs?status=success&per_page=1")
+            created=$(echo "$resp" | jq -r '.workflow_runs[0].created_at // "none"')
+            if [ "$created" = "none" ]; then
+              if [ "$HAVE_PAT" = "1" ]; then
+                report="${report}\n- :x: ${r}: no successful daily run found (failed or never succeeded)"
+                fail=1
+              else
+                report="${report}\n- :fast_forward: ${r}: skipped (private; FLEET_PAT not set)"
+                warn=1
+              fi
+              continue
+            fi
+            ts=$(date -u -d "$created" +%s)
+            age=$(( (now - ts) / 3600 ))
+            if [ "$age" -gt "$MAX_AGE_HOURS" ]; then
+              report="${report}\n- :x: ${r}: last success ${age}h ago (> ${MAX_AGE_HOURS}h)"
+              fail=1
+            else
+              report="${report}\n- :white_check_mark: ${r}: success ${age}h ago"
+            fi
+          done
+          echo -e "Fleet watchdog @ $(date -u):${report}"
+          echo -e "## Fleet watchdog${report}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$warn" = "1" ]; then
+            echo "::warning::FLEET_PAT not set — private scrapers are NOT being monitored. Add the secret for full coverage."
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::A monitored scraper has no successful daily run within ${MAX_AGE_HOURS}h — fleet needs attention."
+            exit 1
+          fi
+          echo "All monitored scrapers green and fresh."
