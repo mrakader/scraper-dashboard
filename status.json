@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-08-22T07:24:26Z",
+  "repos": [
+    {
+      "repo": "scraper",
+      "status": "completed",
+      "conclusion": "success",
+      "run_started_at": "2026-08-21T10:20:23Z",
+      "updated_at": "2026-08-21T10:24:54Z",
+      "run_url": "https://github.com/mrakader/scraper/actions/runs/32472176162",
+      "commit_message": "daily scrape 2026-08-21",
+      "commit_date": "2026-08-21T10:24:46Z"
+    },
+    {
+      "repo": "tfg-scraper",
+      "status": "completed",
+      "conclusion": "success",
+      "run_started_at": "2026-08-21T10:16:01Z",
+      "updated_at": "2026-08-21T10:44:50Z",
+      "run_url": "https://github.com/mrakader/tfg-scraper/actions/runs/32471843850",
+      "commit_message": "daily scrape 2026-08-21",
+      "commit_date": "2026-08-21T10:44:40Z"
+    },
+    {
+      "repo": "bash-mens-scraper",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_started_at": "2026-08-21T10:36:18Z",
+      "updated_at": "2026-08-21T10:38:52Z",
+      "run_url": "https://github.com/mrakader/bash-mens-scraper/actions/runs/32473394023",
+      "commit_message": "daily scrape 2026-08-20",
+      "commit_date": "2026-08-20T10:51:25Z"
+    },
+    {
+      "repo": "superbalist-scraper",
+      "status": "completed",
+      "conclusion": "success",
+      "run_started_at": "2026-08-21T18:37:47Z",
+      "updated_at": "2026-08-21T18:38:52Z",
+      "run_url": "https://github.com/mrakader/superbalist-scraper/actions/runs/32514320363",
+      "commit_message": "daily scrape 2026-08-21",
+      "commit_date": "2026-08-21T18:38:41Z"
+    },
+    {
+      "repo": "evolve-scraper",
+      "status": "completed",
+      "conclusion": "success",
+      "run_started_at": "2026-08-21T10:24:15Z",
+      "updated_at": "2026-08-21T10:31:06Z",
+      "run_url": "https://github.com/mrakader/evolve-scraper/actions/runs/32472470237",
+      "commit_message": "daily scrape 2026-08-21",
+      "commit_date": "2026-08-21T10:31:00Z"
+    },
+    {
+      "repo": "fashion-fusion-scraper",
+      "status": "completed",
+      "conclusion": "success",
+      "run_started_at": "2026-08-21T10:29:01Z",
+      "updated_at": "2026-08-21T11:21:19Z",
+      "run_url": "https://github.com/mrakader/fashion-fusion-scraper/actions/runs/32472834802",
+      "commit_message": "daily scrape 2026-08-21",
+      "commit_date": "2026-08-21T11:21:13Z"
+    }
+  ]
+}

@@ -9,19 +9,29 @@ name: fleet-watchdog
 # Needs repo secret FLEET_PAT (a PAT with Actions:read on the private scraper repos)
 # to see the 5 private repos. WITHOUT it, it monitors only the public repo and emits a
 # non-failing warning, so it never false-alarms before the secret is configured.
+#
+# ALSO PUBLISHES status.json. The dashboard is a static page: it can only reach the
+# GitHub API from the visitor's browser, and 5 of the 6 scrapers are private, so
+# without a PAT pasted into THAT browser it could show nothing at all — a setup wall
+# on every new device, phone or cleared profile. This job already holds a PAT that can
+# read all six, so it writes what it learns to a public status.json the page can read
+# with no token whatsoever. A token is now only needed to TRIGGER runs.
 
 on:
   schedule:
-    - cron: "37 19 * * *"   # 19:37 UTC daily, after the ~15:30 UTC scrape window
+    # Every 3h so the published status.json never goes badly stale. :37 keeps the
+    # daily health verdict after the ~10:30 UTC scrape window, as before.
+    - cron: "37 */3 * * *"
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write        # needed to commit status.json
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Check all 6 scrapers had a recent successful daily run
         env:
           GH_PAT: ${{ secrets.FLEET_PAT }}
@@ -32,11 +42,32 @@ jobs:
           HAVE_PAT=0; [ -n "${GH_PAT:-}" ] && HAVE_PAT=1
           now=$(date -u +%s)
           fail=0; warn=0; report=""
+          echo "{" > status.json
+          echo "  \"generated_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," >> status.json
+          echo "  \"repos\": [" >> status.json
+          first=1
           for r in $REPOS; do
             hdr=(-H "Accept: application/vnd.github+json")
             [ "$HAVE_PAT" = "1" ] && hdr+=(-H "Authorization: Bearer $GH_PAT")
             resp=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/actions/workflows/daily.yml/runs?status=success&per_page=1")
             created=$(echo "$resp" | jq -r '.workflow_runs[0].created_at // "none"')
+
+            # Latest run of ANY conclusion — the health verdict below only counts
+            # SUCCESSES, but the dashboard must be able to show a red tile when the
+            # most recent run failed, which a success-only query can never reveal.
+            last=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/actions/runs?per_page=1")
+            commit=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/commits?per_page=1")
+            [ "$first" = "1" ] && first=0 || echo "," >> status.json
+            jq -n --arg repo "$r" --arg lastSuccess "$created" \
+                  --argjson run "$(echo "$last" | jq '.workflow_runs[0] // null')" \
+                  --argjson commit "$(echo "$commit" | jq '.[0] // null')" \
+              '{repo: $repo, last_success: $lastSuccess,
+                status: ($run.status // null), conclusion: ($run.conclusion // null),
+                run_started_at: ($run.run_started_at // $run.created_at // null),
+                updated_at: ($run.updated_at // null),
+                run_url: ($run.html_url // null),
+                commit_message: ($commit.commit.message // null | split("\n")[0]),
+                commit_date: ($commit.commit.author.date // null)}' >> status.json
             if [ "$created" = "none" ]; then
               if [ "$HAVE_PAT" = "1" ]; then
                 report="${report}\n- :x: ${r}: no successful daily run found (failed or never succeeded)"
@@ -56,6 +87,10 @@ jobs:
               report="${report}\n- :white_check_mark: ${r}: success ${age}h ago"
             fi
           done
+          echo "  ]" >> status.json
+          echo "}" >> status.json
+          jq . status.json > /dev/null || { echo "::error::status.json is not valid JSON"; exit 1; }
+
           echo -e "Fleet watchdog @ $(date -u):${report}"
           echo -e "## Fleet watchdog${report}" >> "$GITHUB_STEP_SUMMARY"
           if [ "$warn" = "1" ]; then
@@ -66,3 +101,17 @@ jobs:
             exit 1
           fi
           echo "All monitored scrapers green and fresh."
+
+      - name: Publish status.json
+        # Runs even when the health check failed above — a red fleet is exactly when
+        # the dashboard most needs fresh data.
+        if: always()
+        run: |
+          set -euo pipefail
+          [ -f status.json ] || exit 0
+          git config user.name  "fleet-watchdog"
+          git config user.email "actions@github.com"
+          git add status.json
+          git diff --cached --quiet && { echo "status.json unchanged"; exit 0; }
+          git commit -m "fleet status $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push

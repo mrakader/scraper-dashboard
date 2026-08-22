@@ -388,6 +388,41 @@ async function gh(path, opts = {}) {
   return res.json();
 }
 
+// Read the status.json the fleet-watchdog publishes. This is the ONLY path that
+// works with no token: 5 of the 6 scrapers are private, so a tokenless browser can
+// learn nothing from api.github.com directly. Cache-busted because GitHub Pages
+// caches aggressively and a stale health page is worse than none.
+async function fetchPublishedStatus() {
+  try {
+    const res = await fetch("status.json?t=" + Date.now(), {cache: "no-store"});
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || !Array.isArray(data.repos)) return null;
+    return data;
+  } catch { return null; }
+}
+
+// Shape a published entry like a live API result so render code stays identical.
+function fromPublished(data, r) {
+  const e = (data.repos || []).find(x => x.repo === r.repo);
+  if (!e) return {ok: false, err: {code: 0}, stale: true};
+  return {
+    ok: true,
+    published: true,
+    generated_at: data.generated_at,
+    run: e.conclusion || e.status ? {
+      status: e.status || "completed",
+      conclusion: e.conclusion,
+      run_started_at: e.run_started_at,
+      created_at: e.run_started_at,
+      updated_at: e.updated_at,
+      html_url: e.run_url,
+    } : null,
+    commit: e.commit_message ? {commit: {message: e.commit_message,
+                                          author: {date: e.commit_date}}} : null,
+  };
+}
+
 async function fetchRepo(r) {
   try {
     const [runs, commits] = await Promise.all([
@@ -477,9 +512,11 @@ function renderSetup(errorMsg) {
       <div class="setup">
         <h2>Welcome</h2>
         <div class="lede">
-          A private dashboard for your scrapers. It reads GitHub Actions
-          status — and now, can trigger runs too. Token stays in your
-          browser; nothing is sent anywhere except <code>api.github.com</code>.
+          Health should be visible here without any setup — it is published by the
+          fleet-watchdog. If you are seeing this screen, that published status could
+          not be loaded yet (the watchdog may not have run since this was deployed).
+          A token is only needed to <b>trigger</b> runs; it stays in this browser and
+          is sent nowhere except <code>api.github.com</code>.
         </div>
         ${errorMsg ? `<div class="lede" style="color:var(--red);padding-top:0">${errorMsg}</div>` : ""}
         <div class="steps">
@@ -534,9 +571,11 @@ function subline(data) {
   return `Started ${when}`;
 }
 
-function renderDashboard(results) {
+function renderDashboard(results, publishedAt) {
   lastResults = results;
   lastUpdate = Date.now();
+  window.__publishedAt = publishedAt || null;
+  window.__readOnly = !token();
   const rows = REPOS.map((r, i) => {
     const d = describe(results[i]);
     return `
@@ -730,7 +769,18 @@ function handleApiError(e, what) {
 
 // ---- main load loop ----
 async function loadAll() {
-  if (!token()) return renderSetup();
+  // Published status first — instant, no token, works on any device. Only fall
+  // back to the setup wall when BOTH the published file and a token are missing,
+  // which is the genuinely unrecoverable case.
+  if (!token()) {
+    const pub = await fetchPublishedStatus();
+    if (!pub) return renderSetup();
+    return renderDashboard(REPOS.map(r => fromPublished(pub, r)), pub.generated_at);
+  }
+  if (!lastResults) {
+    const pub = await fetchPublishedStatus();
+    if (pub) renderDashboard(REPOS.map(r => fromPublished(pub, r)), pub.generated_at);
+  }
   if (!lastResults) {
     // First load — show skeleton list while fetching.
     app.innerHTML = `
@@ -757,7 +807,16 @@ async function loadAll() {
     if (!res.ok && res.err && res.err.code === 401) authFailed = true;
     return res;
   }));
-  if (authFailed) return renderSetup("Token rejected or expired. Please paste a new one.");
+  if (authFailed) {
+    // Don't drop the user onto the setup wall if published data can still carry
+    // the page — a dead token should cost the trigger buttons, not the health view.
+    const pub = await fetchPublishedStatus();
+    if (pub) {
+      setToken("");
+      return renderDashboard(REPOS.map(r => fromPublished(pub, r)), pub.generated_at);
+    }
+    return renderSetup("Token rejected or expired. Please paste a new one.");
+  }
   renderDashboard(results);
 }
 
@@ -766,11 +825,11 @@ let refreshTimer = null;
 function startTimer() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
-    if (!document.hidden && token()) loadAll();
+    if (!document.hidden) loadAll();
   }, 60000);
 }
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && token()) loadAll();
+  if (!document.hidden) loadAll();
 });
 startTimer();
 
