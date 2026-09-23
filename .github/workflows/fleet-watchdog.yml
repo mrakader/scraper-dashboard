@@ -4,18 +4,26 @@ name: fleet-watchdog
 # (scraper-dashboard) so it runs on free Actions minutes and its own pass/fail can
 # never masquerade as one of the monitored scrapers. Quiet when healthy; FAILS
 # (-> GitHub emails you) when a monitored scraper has no successful daily run within
-# MAX_AGE_HOURS.
+# its freshness window.
 #
-# Needs repo secret FLEET_PAT (a PAT with Actions:read on the private scraper repos)
-# to see the 5 private repos. WITHOUT it, it monitors only the public repo and emits a
-# non-failing warning, so it never false-alarms before the secret is configured.
+# Needs repo secret FLEET_PAT (a PAT with Actions:read + Contents:read on the private
+# scraper repos) to see the 5 private repos. WITHOUT it, it monitors only the public
+# repo, marks the rest "monitored: false", and emits a non-failing warning.
 #
 # ALSO PUBLISHES status.json. The dashboard is a static page: it can only reach the
 # GitHub API from the visitor's browser, and 5 of the 6 scrapers are private, so
-# without a PAT pasted into THAT browser it could show nothing at all — a setup wall
-# on every new device, phone or cleared profile. This job already holds a PAT that can
-# read all six, so it writes what it learns to a public status.json the page can read
-# with no token whatsoever. A token is now only needed to TRIGGER runs.
+# without a PAT pasted into THAT browser it could show nothing at all. This job writes
+# what it learns to a public status.json the page can read with no token.
+#
+# ⚠️ FIXED 2026-09-23 — every run from the day this shipped had FAILED, and the
+# publish step (if: always) committed the half-written file every 3h, so the page
+# showed nothing for weeks. Cause: the GitHub API answers errors (404 on a private
+# repo without a token, 401 bad token, 403 rate limit) with an OBJECT
+# {"message":...} where success is an ARRAY. `jq '.[0] // null'` does not catch
+# that — `//` only handles null/false; indexing an object with a number is an ERROR.
+# jq printed nothing, `--argjson commit ""` then failed, and the step died on the
+# FIRST repo, leaving a 57-byte stub. Now: every read is type-guarded, JSON is built
+# as data (never string-concatenated), and a file is only published if it validates.
 
 on:
   schedule:
@@ -38,39 +46,60 @@ jobs:
         run: |
           set -uo pipefail
           REPOS="scraper tfg-scraper bash-mens-scraper superbalist-scraper evolve-scraper fashion-fusion-scraper"
-          MAX_AGE_HOURS=36
+          # Superbalist runs EVERY OTHER day (odd days, 3 fires to roll for a runner
+          # IP Cloudflare doesn't block, ~5h when one lands). A single 36h limit
+          # false-alarmed it on every off-day. 60h = a missed whole run-day, which is
+          # a genuine gap worth an email.
+          max_age() { case "$1" in superbalist-scraper) echo 60 ;; *) echo 36 ;; esac; }
           HAVE_PAT=0; [ -n "${GH_PAT:-}" ] && HAVE_PAT=1
           now=$(date -u +%s)
           fail=0; warn=0; report=""
-          echo "{" > status.json
-          echo "  \"generated_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"," >> status.json
-          echo "  \"repos\": [" >> status.json
-          first=1
+          entries='[]'
+
+          # Type guards. Each ALWAYS yields valid JSON, whatever the API sent back.
+          FIRST_RUN='if type=="object" and (.workflow_runs|type)=="array" then .workflow_runs[0] else null end'
+          FIRST_ELEM='if type=="array" then .[0] else null end'
+          API_ERR='if type=="object" and has("message") then .message else empty end'
+
+          get() {  # url -> body; anything that is not JSON becomes an error object
+            local body
+            body=$(curl -s --max-time 20 "${hdr[@]}" "$1" 2>/dev/null || true)
+            if printf '%s' "$body" | jq -e . >/dev/null 2>&1; then printf '%s' "$body"
+            else printf '{"message":"non-JSON or empty response"}'; fi
+          }
+
           for r in $REPOS; do
             hdr=(-H "Accept: application/vnd.github+json")
             [ "$HAVE_PAT" = "1" ] && hdr+=(-H "Authorization: Bearer $GH_PAT")
-            resp=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/actions/workflows/daily.yml/runs?status=success&per_page=1")
-            created=$(echo "$resp" | jq -r '.workflow_runs[0].created_at // "none"')
+            ok=$(get "https://api.github.com/repos/mrakader/$r/actions/workflows/daily.yml/runs?status=success&per_page=1")
+            last=$(get "https://api.github.com/repos/mrakader/$r/actions/runs?per_page=1")
+            commit=$(get "https://api.github.com/repos/mrakader/$r/commits?per_page=1")
 
-            # Latest run of ANY conclusion — the health verdict below only counts
-            # SUCCESSES, but the dashboard must be able to show a red tile when the
-            # most recent run failed, which a success-only query can never reveal.
-            last=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/actions/runs?per_page=1")
-            commit=$(curl -s "${hdr[@]}" "https://api.github.com/repos/mrakader/$r/commits?per_page=1")
-            [ "$first" = "1" ] && first=0 || echo "," >> status.json
-            jq -n --arg repo "$r" --arg lastSuccess "$created" \
-                  --argjson run "$(echo "$last" | jq '.workflow_runs[0] // null')" \
-                  --argjson commit "$(echo "$commit" | jq '.[0] // null')" \
+            created=$(printf '%s' "$ok" | jq -r "($FIRST_RUN) | .created_at // \"none\"")
+            err=$(printf '%s' "$commit" | jq -r "$API_ERR")
+            run_j=$(printf '%s' "$last" | jq -c "$FIRST_RUN")
+            com_j=$(printf '%s' "$commit" | jq -c "$FIRST_ELEM")
+
+            entry=$(jq -nc --arg repo "$r" --arg lastSuccess "$created" --arg err "$err" \
+                        --argjson run "$run_j" --argjson commit "$com_j" \
+                        --argjson maxAge "$(max_age "$r")" \
               '{repo: $repo, last_success: $lastSuccess,
+                monitored: ($err == ""),
+                error: (if $err == "" then null else $err end),
+                max_age_hours: $maxAge,
                 status: ($run.status // null), conclusion: ($run.conclusion // null),
                 run_started_at: ($run.run_started_at // $run.created_at // null),
                 updated_at: ($run.updated_at // null),
                 run_url: ($run.html_url // null),
-                commit_message: ($commit.commit.message // null | split("\n")[0]),
-                commit_date: ($commit.commit.author.date // null)}' >> status.json
+                commit_message: (if ($commit.commit.message | type) == "string"
+                                 then ($commit.commit.message | split("\n")[0]) else null end),
+                commit_date: ($commit.commit.author.date // null)}') \
+              || entry=$(jq -nc --arg repo "$r" '{repo: $repo, monitored: false, error: "watchdog could not build entry"}')
+            entries=$(printf '%s' "$entries" | jq -c --argjson e "$entry" '. + [$e]')
+
             if [ "$created" = "none" ]; then
               if [ "$HAVE_PAT" = "1" ]; then
-                report="${report}\n- :x: ${r}: no successful daily run found (failed or never succeeded)"
+                report="${report}\n- :x: ${r}: no successful daily run found${err:+ ($err)}"
                 fail=1
               else
                 report="${report}\n- :fast_forward: ${r}: skipped (private; FLEET_PAT not set)"
@@ -80,16 +109,25 @@ jobs:
             fi
             ts=$(date -u -d "$created" +%s)
             age=$(( (now - ts) / 3600 ))
-            if [ "$age" -gt "$MAX_AGE_HOURS" ]; then
-              report="${report}\n- :x: ${r}: last success ${age}h ago (> ${MAX_AGE_HOURS}h)"
+            lim=$(max_age "$r")
+            if [ "$age" -gt "$lim" ]; then
+              report="${report}\n- :x: ${r}: last success ${age}h ago (> ${lim}h)"
               fail=1
             else
               report="${report}\n- :white_check_mark: ${r}: success ${age}h ago"
             fi
           done
-          echo "  ]" >> status.json
-          echo "}" >> status.json
-          jq . status.json > /dev/null || { echo "::error::status.json is not valid JSON"; exit 1; }
+
+          # Built as data, validated, THEN moved into place — a crash can never
+          # leave a half-written status.json behind to be published.
+          jq -n --arg gen "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson repos "$entries" \
+                --argjson pat "$HAVE_PAT" \
+            '{generated_at: $gen, pat_configured: ($pat == 1), repos: $repos}' > status.tmp
+          if jq -e '.repos | length == 6' status.tmp >/dev/null 2>&1; then
+            mv status.tmp status.json
+          else
+            echo "::error::status.json failed validation — NOT publishing"; rm -f status.tmp; exit 1
+          fi
 
           echo -e "Fleet watchdog @ $(date -u):${report}"
           echo -e "## Fleet watchdog${report}" >> "$GITHUB_STEP_SUMMARY"
@@ -97,18 +135,20 @@ jobs:
             echo "::warning::FLEET_PAT not set — private scrapers are NOT being monitored. Add the secret for full coverage."
           fi
           if [ "$fail" -ne 0 ]; then
-            echo "::error::A monitored scraper has no successful daily run within ${MAX_AGE_HOURS}h — fleet needs attention."
+            echo "::error::A monitored scraper has no successful daily run within its freshness window — fleet needs attention."
             exit 1
           fi
           echo "All monitored scrapers green and fresh."
 
       - name: Publish status.json
         # Runs even when the health check failed above — a red fleet is exactly when
-        # the dashboard most needs fresh data.
+        # the dashboard most needs fresh data. But ONLY a file that validates: the
+        # original published whatever was on disk, including a 57-byte stub.
         if: always()
         run: |
           set -euo pipefail
-          [ -f status.json ] || exit 0
+          [ -f status.json ] || { echo "no status.json produced"; exit 0; }
+          jq -e '.repos | length == 6' status.json >/dev/null || { echo "::error::refusing to publish invalid status.json"; exit 1; }
           git config user.name  "fleet-watchdog"
           git config user.email "actions@github.com"
           git add status.json

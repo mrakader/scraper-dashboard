@@ -406,6 +406,10 @@ async function fetchPublishedStatus() {
 function fromPublished(data, r) {
   const e = (data.repos || []).find(x => x.repo === r.repo);
   if (!e) return {ok: false, err: {code: 0}, stale: true};
+  // The watchdog could not see this repo (private, and its FLEET_PAT secret is
+  // missing or expired). Without this the tile fell through to "No runs yet" —
+  // falsely telling you a scraper that runs every day had never run.
+  if (e.monitored === false) return {ok: false, err: {code: "unmonitored", message: e.error}};
   return {
     ok: true,
     published: true,
@@ -551,7 +555,8 @@ let updateTickHandle = null;
 
 function describe(data) {
   if (!data.ok) {
-    return {dot: "idle", label: data.err && data.err.code === 403 ? "No access" : "Error"};
+    const c = data.err && data.err.code;
+    return {dot: "idle", label: c === 403 ? "No access" : c === "unmonitored" ? "Not monitored" : "Error"};
   }
   return statusOf(data.run);
 }
@@ -560,6 +565,7 @@ function subline(data) {
     const c = data.err && data.err.code;
     if (c === 403) return "Token can't read this repo";
     if (c === 404) return "Repository not found";
+    if (c === "unmonitored") return "Private repo — the watchdog needs its FLEET_PAT secret";
     return "Couldn't fetch";
   }
   const run = data.run;
