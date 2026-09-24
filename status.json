@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-24T09:44:22Z",
+  "generated_at": "2026-09-24T12:51:57Z",
   "pat_configured": false,
   "repos": [
     {
@@ -38,9 +38,9 @@
       "max_age_hours": 36,
       "status": "completed",
       "conclusion": "failure",
-      "run_started_at": "2026-09-23T10:18:48Z",
-      "updated_at": "2026-09-23T10:33:18Z",
-      "run_url": "https://github.com/mrakader/bash-mens-scraper/actions/runs/35848066101",
+      "run_started_at": "2026-09-24T10:18:54Z",
+      "updated_at": "2026-09-24T10:33:26Z",
+      "run_url": "https://github.com/mrakader/bash-mens-scraper/actions/runs/35986490002",
       "commit_message": "daily scrape 2026-09-22",
       "commit_date": "2026-09-22T10:37:15Z"
     },
@@ -62,7 +62,7 @@
       "repo": "evolve-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 20.62.254.167. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
@@ -76,7 +76,7 @@
       "repo": "fashion-fusion-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 20.62.254.167. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
