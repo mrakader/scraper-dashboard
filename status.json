@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-11T01:23:15Z",
+  "generated_at": "2026-10-11T03:54:11Z",
   "pat_configured": false,
   "repos": [
     {
@@ -62,7 +62,7 @@
       "repo": "evolve-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 52.161.50.34. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
@@ -76,7 +76,7 @@
       "repo": "fashion-fusion-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 52.161.50.34. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
