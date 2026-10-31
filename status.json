@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-31T12:39:18Z",
+  "generated_at": "2026-10-31T15:39:36Z",
   "pat_configured": false,
   "repos": [
     {
@@ -38,9 +38,9 @@
       "max_age_hours": 36,
       "status": "completed",
       "conclusion": "failure",
-      "run_started_at": "2026-10-31T10:09:50Z",
-      "updated_at": "2026-10-31T10:29:20Z",
-      "run_url": "https://github.com/mrakader/bash-mens-scraper/actions/runs/41191615893",
+      "run_started_at": "2026-10-31T15:09:52Z",
+      "updated_at": "2026-10-31T15:25:58Z",
+      "run_url": "https://github.com/mrakader/bash-mens-scraper/actions/runs/41213522883",
       "commit_message": "daily scrape 2026-10-24",
       "commit_date": "2026-10-24T10:29:01Z"
     },
