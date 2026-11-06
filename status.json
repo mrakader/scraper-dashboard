@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-06T15:41:11Z",
+  "generated_at": "2026-11-06T18:39:32Z",
   "pat_configured": false,
   "repos": [
     {
       "repo": "scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "non-JSON or empty response",
+      "error": "Not Found",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
@@ -20,7 +20,7 @@
       "repo": "tfg-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "non-JSON or empty response",
+      "error": "Not Found",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
@@ -33,16 +33,16 @@
     {
       "repo": "bash-mens-scraper",
       "last_success": "2026-11-06T15:11:34Z",
-      "monitored": false,
-      "error": "non-JSON or empty response",
+      "monitored": true,
+      "error": null,
       "max_age_hours": 36,
       "status": "completed",
       "conclusion": "success",
       "run_started_at": "2026-11-06T15:11:34Z",
       "updated_at": "2026-11-06T15:11:50Z",
       "run_url": "https://github.com/mrakader/bash-mens-scraper/actions/runs/42240723254",
-      "commit_message": null,
-      "commit_date": null
+      "commit_message": "daily scrape 2026-11-06",
+      "commit_date": "2026-11-06T10:29:52Z"
     },
     {
       "repo": "superbalist-scraper",
