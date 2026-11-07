@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-07T15:39:15Z",
+  "generated_at": "2026-11-07T18:39:39Z",
   "pat_configured": false,
   "repos": [
     {
@@ -48,7 +48,7 @@
       "repo": "superbalist-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 172.212.230.122. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 60,
       "status": null,
       "conclusion": null,
@@ -62,7 +62,7 @@
       "repo": "evolve-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 172.212.230.122. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
@@ -76,7 +76,7 @@
       "repo": "fashion-fusion-scraper",
       "last_success": "none",
       "monitored": false,
-      "error": "Not Found",
+      "error": "API rate limit exceeded for 172.212.230.122. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)",
       "max_age_hours": 36,
       "status": null,
       "conclusion": null,
